@@ -1,0 +1,7 @@
+# ignore host node_modules so container builds its own native modules
+**/node_modules
+db.sqlite
+.env
+.DS_Store
+.vscode
+dist
