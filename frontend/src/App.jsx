@@ -1,27 +1,88 @@
-﻿import React, { useEffect, useState } from "react";
-import ProductCard from "./components/ProductCard";
+﻿import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 
-export default function App() {
-  const [products, setProducts] = useState([]);
+import Navbar from "./Navbar";
+import Login from "./Login";
+import Signup from "./Signup";
+import FarmerStore from "./FarmerStore";
+import ProtectedRoute from "./ProtectedRoute";
+import Cart from "./Cart";
+import Checkout from "./Checkout";
+import OrderSuccess from "./OrderSuccess";
 
+function App() {
+  // 🛒 CART STATE
+  const [cart, setCart] = useState(
+    JSON.parse(localStorage.getItem("cart")) || []
+  );
+
+  // 💾 SAVE CART TO LOCAL STORAGE
   useEffect(() => {
-    fetch("http://localhost:4000/products")
-      .then(res => res.json())
-      .then(data => setProducts(data))
-      .catch(err => console.log("API error:", err));
-  }, []);
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h1>Farmer Store Products</h1>
+    <Routes>
+      {/* ✅ DEFAULT ROUTE */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {products.length === 0 ? (
-          <div>Loading or no products — make sure backend is running</div>
-        ) : (
-          products.map((item) => <ProductCard key={item.id} product={item} />)
-        )}
-      </div>
-    </div>
+      {/* 🔐 AUTH ROUTES */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+
+      {/* 🌾 STORE PAGE */}
+      <Route
+        path="/store"
+        element={
+          <ProtectedRoute>
+            <div>
+              <Navbar cart={cart} setCart={setCart} />
+              <FarmerStore cart={cart} setCart={setCart} />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 🛒 CART PAGE */}
+      <Route
+        path="/cart"
+        element={
+          <ProtectedRoute>
+            <div>
+              <Navbar cart={cart} setCart={setCart} />
+              <Cart cart={cart} setCart={setCart} />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 🧾 CHECKOUT PAGE */}
+      <Route
+        path="/checkout"
+        element={
+          <ProtectedRoute>
+            <div>
+              <Navbar cart={cart} setCart={setCart} />
+              <Checkout cart={cart} setCart={setCart} />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 🎉 ORDER SUCCESS PAGE */}
+      <Route
+        path="/success"
+        element={
+          <ProtectedRoute>
+            <div>
+              <Navbar cart={cart} setCart={setCart} />
+              <OrderSuccess />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
+
+export default App;

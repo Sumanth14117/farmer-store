@@ -1,13 +1,16 @@
 {
-  "name": "backend",
+  "name": "farmer-store-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend API for Farmer Online Store",
   "main": "index.js",
 
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon index.js"
+  },
+
+  "engines": {
+    "node": ">=18"
   },
 
   "keywords": [],
