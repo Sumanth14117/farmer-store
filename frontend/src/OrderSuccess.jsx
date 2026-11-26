@@ -1,53 +1,23 @@
-import { Link } from "react-router-dom";
-
+import { useEffect, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { getOrder } from "./api";
 export default function OrderSuccess() {
-  return (
-    <div style={fullPage}>
-      <div style={card}>
-        <h1 style={{ fontSize: "32px", marginBottom: "10px" }}>
-          🎉 Order Successful!
-        </h1>
-
-        <p style={{ color: "#555", marginBottom: "25px" }}>
-          Your order has been placed successfully.
-        </p>
-
-        <Link to="/store" style={button}>
-          Continue Shopping
-        </Link>
-      </div>
-    </div>
-  );
+  const { state } = useLocation();
+  const [params] = useSearchParams();
+  const id = params.get("id");
+  const [order, setOrder] = useState(state?.order || null);
+  const [loading, setLoading] = useState(Boolean(id && !state?.order));
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!id || state?.order) return;
+    let active = true;
+    getOrder(id).then((data) => { if (active) setOrder(data.order); })
+      .catch((err) => { if (active) setError(err.message || "Order confirmation is unavailable"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id, state]);
+  return <section className="content-page success-page"><div className="success-card">
+    {loading ? <p role="status">Loading order confirmation…</p> : order ? <><p className="eyebrow">Order placed</p><h1>Thank you!</h1><p>Your order has been saved successfully.</p><p><strong>Order #{order.id}</strong> · {order.status}</p><ul>{order.items.map((item, i) => <li key={`${item.productId}-${i}`}>{item.name} × {item.qty}</li>)}</ul><p>Total: <strong>₹{Number(order.total).toFixed(2)}</strong></p></> : <><h1>No recent confirmation found</h1><p>{error || "Place an order before visiting this page."}</p></>}
+    <div className="button-row"><Link className="button-link" to="/orders">View my orders</Link><Link className="text-link" to="/store">Continue shopping</Link></div>
+  </div></section>;
 }
-
-/* ✅ FULL PAGE BACKGROUND */
-const fullPage = {
-  width: "100vw",
-  minHeight: "calc(100vh - 64px)", // height after navbar
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  background: "linear-gradient(135deg, #e8f5e9, #f1f8e9)",
-};
-
-/* ✅ CENTER CARD */
-const card = {
-  background: "#fff",
-  padding: "40px",
-  borderRadius: "14px",
-  textAlign: "center",
-  width: "100%",
-  maxWidth: "420px",
-  boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-};
-
-/* ✅ BUTTON */
-const button = {
-  display: "inline-block",
-  padding: "12px 26px",
-  background: "#2e7d32",
-  color: "#fff",
-  borderRadius: "6px",
-  textDecoration: "none",
-  fontSize: "16px",
-};

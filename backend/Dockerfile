@@ -27,4 +27,4 @@ RUN npm rebuild sqlite3 --build-from-source || true
 
 EXPOSE 4000
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]

@@ -1,129 +1,135 @@
-// backend/index.js
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
-const db = require("./db");
-const jwt = require("jsonwebtoken");
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-// ============================
-// 🔐 AUTH MIDDLEWARE
-// ============================
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: "No token provided" });
+let config;
+try {
+  config = require("./config");
+} catch (error) {
+  if (require.main === module) {
+    console.error(error.message);
+    process.exit(1);
   }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secret123"
-    );
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: "Invalid token" });
-  }
+  throw error;
 }
-
-// ============================
-// 📦 STATIC IMAGES
-// ============================
-app.use("/images", express.static(path.join(__dirname, "images")));
-
-// ============================
-// 🔍 AUTH REQUEST LOGGER
-// ============================
-app.use("/api/auth", (req, res, next) => {
-  console.log(
-    ">> incoming to /api/auth:",
-    req.method,
-    req.originalUrl,
-    "body=",
-    req.body
-  );
-  next();
-});
-
-// ============================
-// 🔐 AUTH ROUTES
-// ============================
-const userRoutes = require("./userRoutes");
-app.use("/api/auth", userRoutes);
-
-// ============================
-// ❤️ HEALTH CHECK
-// ============================
-app.get("/health", (req, res) => {
-  res.json({ ok: true });
-});
-
-// ============================
-// 🛒 GET PRODUCTS (PROTECTED)
-// ============================
-app.get("/api/products", authMiddleware, (req, res) => {
-  db.all(
-    "SELECT id, name, description, price, image, location FROM products ORDER BY id DESC",
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-
-      const products = rows.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        location: p.location,
-        imageUrl: `http://localhost:4000/images/${p.image}`,
-      }));
-
-      res.json(products);
-    }
-  );
-});
-
-// ============================
-// ➕ ADD PRODUCT (OPTIONAL)
-// ============================
-app.post("/api/products", authMiddleware, (req, res) => {
-  const { name, description, price, image, location } = req.body;
-
-  if (!name || price == null) {
-    return res.status(400).json({ error: "name and price required" });
+const database = require("./db");
+const {
+  createAuthMiddleware,
+  createRateLimiter,
+  safeErrorHandler
+} = require("./middleware");
+const {
+  createAuthRouter
+} = require("./authRoutes");
+const {
+  createProductRouter
+} = require("./productRoutes");
+const {
+  createOrderRouter
+} = require("./orderRoutes");
+const {
+  createReviewRouter
+} = require("./reviewRoutes");
+const {
+  createAdminRouter
+} = require("./adminRoutes");
+const {
+  createProfileRouter
+} = require("./profileRoutes");
+const { createApplicantRouter, createAdminApplicationsRouter } = require("./farmerApplicationRoutes");
+function parseCookies(req, _res, next) {
+  const header = req.headers.cookie || "";
+  req.cookies = {};
+  for (const part of header.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    try {
+      req.cookies[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    } catch {}
   }
-
-  db.run(
-    "INSERT INTO products (name, description, price, image, location) VALUES (?,?,?,?,?)",
-    [name, description, price, image || "", location || ""],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.json({ id: this.lastID });
-    }
-  );
+  next();
+}
+function createApp(options = {}) {
+  const db = options.database || database,
+    secret = options.secret || config.jwtSecret;
+  if (typeof secret !== "string" || secret.length < 32) throw new Error("A strong JWT_SECRET is required");
+  const origins = options.allowedOrigins || config.allowedOrigins,
+    auth = createAuthMiddleware(db, secret),
+    rateLimit = options.rateLimit || createRateLimiter({
+      windowMs: config.authRateLimitWindowMs,
+      max: config.authRateLimitMax
+    }),
+    app = express();
+  app.disable("x-powered-by");
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || origins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS origin denied"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-CSRF-Token"],
+    maxAge: 600
+  }));
+  app.use(express.json({
+    limit: "32kb",
+    strict: true
+  }));
+  app.use(parseCookies);
+  app.use((req, res, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method) && req.headers.origin && !origins.includes(req.headers.origin)) return res.status(403).json({
+      error: "Origin not allowed"
+    });
+    next();
+  });
+  app.get("/health", (_req, res) => res.json({
+    ok: true
+  }));
+  app.use("/api/auth", createAuthRouter({
+    db,
+    secret,
+    auth,
+    rateLimit,
+    googleClient: options.googleClient
+  }));
+  app.use("/api/profile", createProfileRouter({
+    db,
+    auth
+  }));
+  app.use("/api/farmer-applications", createApplicantRouter({ db, auth }));
+  app.use("/api/admin/farmer-applications", createAdminApplicationsRouter({ db, auth }));
+  app.use("/api/products/:productId/reviews", createReviewRouter({
+    db,
+    auth
+  }));
+  app.use("/api/products", createProductRouter({
+    db,
+    auth
+  }));
+  app.use("/api/orders", createOrderRouter({
+    db,
+    auth
+  }));
+  app.use("/api/admin", createAdminRouter({
+    db,
+    auth
+  }));
+  app.use((_req, res) => res.status(404).json({
+    error: "Route not found"
+  }));
+  app.use(safeErrorHandler);
+  return app;
+}
+const app = createApp();
+async function startServer() {
+  await database.ready;
+  return app.listen(config.port, "0.0.0.0", () => console.log(`API listening on port ${config.port}`));
+}
+if (require.main === module) startServer().catch(async () => {
+  console.error("Startup failed: database initialization could not be completed.");
+  await database.closeAsync().catch(() => {});
+  process.exitCode = 1;
 });
-
-// ============================
-// 🧪 TEST ROUTE
-// ============================
-app.post("/test-signup", (req, res) => {
-  console.log(">> /test-signup hit, body=", req.body);
-  res.json({ ok: true, path: "/test-signup" });
-});
-
-// ============================
-// 🚀 START SERVER
-// ============================
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`API listening on http://localhost:${PORT}`);
-});
+module.exports = {
+  app,
+  createApp,
+  startServer
+};

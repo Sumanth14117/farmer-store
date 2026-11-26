@@ -1,0 +1,62 @@
+# Secrets and real environment files
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases and sidecars
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db3
+*.db3-*
+*.sqb
+*.sqbpro
+*.sqbproj
+
+# Backups, exports, and private archives
+backups/
+**/backups/
+farmer-store-backups/
+**/farmer-store-backups/
+*.bak
+*.backup
+*.dump
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+
+# Local runtime data and private files
+.git/
+uploads/
+**/uploads/
+private-uploads/
+**/private-uploads/
+local-uploads/
+**/local-uploads/
+private-documents/
+private-docs/
+quarantine/
+private-quarantine/
+**/private-quarantine/
+
+# Dependencies, tests, logs, and generated output
+node_modules/
+**/node_modules/
+test/
+**/test/
+coverage/
+dist/
+build/
+.cache/
+tmp/
+temp/
+*.log
+npm-debug.log*
+.DS_Store

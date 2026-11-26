@@ -1,68 +1,48 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { API_BASE } from "./api";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { getGoogleStatus, loginUser, startGoogleLogin } from "./api";
+import { useAuth } from "./useAuth";
 import "./Login.css";
-
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState("");
-  const navigate = useNavigate();
-
-  async function handleLogin(e) {
+  const [email, setEmail] = useState(""),
+    [password, setPassword] = useState(""),
+    [message, setMessage] = useState(""),
+    [busy, setBusy] = useState(false),
+    [googleStatus, setGoogleStatus] = useState("checking"),
+    navigate = useNavigate(),
+    {
+      login
+    } = useAuth();
+  useEffect(() => {
+    getGoogleStatus().then(x => setGoogleStatus(x.enabled ? "enabled" : "disabled")).catch(() => setGoogleStatus("disabled"));
+  }, []);
+  async function submit(e) {
     e.preventDefault();
-
+    setMessage("");
+    setBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const d = await loginUser({
+        email,
+        password
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMsg(data.error || "Login failed");
-        return;
-      }
-
-      localStorage.setItem("token", data.token);
-      navigate("/store");
-    } catch (err) {
-      setMsg("Server error");
+      login(d.accessToken, d.user);
+      navigate("/store", {
+        replace: true
+      });
+    } catch (x) {
+      setMessage(x.message || "Unable to sign in");
+    } finally {
+      setBusy(false);
     }
   }
-
-  return (
-    <div className="login-page">
-      <form className="login-card" onSubmit={handleLogin}>
-        <h2>🌾 Farmer Store</h2>
-        <p className="subtitle">Login to continue</p>
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-
-        <button type="submit">Login</button>
-
-        {msg && <p className="error">{msg}</p>}
-
-        <p className="switch">
-          New user? <Link to="/signup">Create account</Link>
-        </p>
-      </form>
-    </div>
-  );
+  async function googleLogin() {
+    setBusy(true);
+    try {
+      await startGoogleLogin();
+    } catch (e) {
+      setMessage(e.message || "Google sign-in is unavailable");
+      setBusy(false);
+    }
+  }
+  return <div className="auth-page"><form className="auth-card" onSubmit={submit}><h1>🌾 Farmer Store</h1><p className="subtitle">Sign in to your account</p><button type="button" disabled={busy || googleStatus !== "enabled"} onClick={googleLogin}>{googleStatus === "enabled" ? "Continue with Google" : googleStatus === "checking" ? "Checking Google sign-in…" : "Google sign-in unavailable"}</button><label>Email<input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} /></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} /></label><button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>{message && <p className="form-error" role="alert">{message}</p>}<p className="switch">New to Farmer Store? <Link to="/signup">Create an account</Link></p></form></div>;
 }

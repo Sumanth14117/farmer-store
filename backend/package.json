@@ -3,29 +3,27 @@
   "version": "1.0.0",
   "description": "Backend API for Farmer Online Store",
   "main": "index.js",
-
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "node --test",
+    "lint": "node --check index.js && node --check db.js && node --check config.js && node --check middleware.js && node --check sqlite.js && node --check authRoutes.js && node --check authSessions.js && node --check productRoutes.js && node --check orderRoutes.js && node --check reviewRoutes.js && node --check adminRoutes.js && node --check profileRoutes.js && node --check farmerApplicationRoutes.js"
   },
-
   "engines": {
     "node": ">=18"
   },
-
   "keywords": [],
   "author": "",
   "license": "ISC",
-
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "sqlite3": "^5.1.7"
+    "express": "^5.3.0",
+    "google-auth-library": "^11.3.4",
+    "jsonwebtoken": "^9.0.3",
+    "sqlite3": "^6.0.1"
   },
-
   "devDependencies": {
     "nodemon": "^3.1.11"
   }

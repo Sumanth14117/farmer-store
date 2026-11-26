@@ -25,3 +25,66 @@ build/
 
 # VS Code
 .vscode/
+
+# Local databases and SQLite sidecars
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.sqbpro
+*.sqbproj
+*.sqb
+
+# Local secrets (keep documented examples trackable)
+.env
+.env.*
+!.env.example
+
+# Runtime, build, and temporary artifacts
+**/node_modules/
+dist/
+build/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.pid
+*.log
+
+# Private local uploads and quarantined artifacts
+uploads/
+private-uploads/
+frontend/public/uploads/
+*.sqlite3
+*.sqlite3-*
+*.db3
+
+# Local-only private artifacts (keep required catalogue images trackable)
+private-artifacts/
+local-uploads/
+frontend/public/images/media_to_upload*
+
+# Publication security: local backups and private artifacts
+backups/
+**/backups/
+backup/
+**/backup/
+farmer-store-backups/
+**/farmer-store-backups/
+*.bak
+*.backup
+*.dump
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+private-documents/
+private-docs/
+quarantine/
+private-quarantine/
+**/private-quarantine/
+# Sensitive saved page; keep it out of future untracked additions
+/frontend/public/images/download.htm

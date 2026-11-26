@@ -1,142 +1,43 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { placeOrder } from "./api";
 
+const emptyAddress = { name: "", phone: "", street: "", city: "", pincode: "" };
+function newKey() { return globalThis.crypto?.randomUUID?.() || `order-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 export default function Checkout({ cart, setCart }) {
   const navigate = useNavigate();
-
-  // 📦 Address state
-  const [address, setAddress] = useState({
-    name: "",
-    phone: "",
-    street: "",
-    city: "",
-    pincode: "",
-  });
-
-  const total = cart.reduce(
-    (sum, item) => sum + item.price * item.qty,
-    0
-  );
-
-  function handleChange(e) {
-    setAddress({ ...address, [e.target.name]: e.target.value });
+  const [address, setAddress] = useState(emptyAddress);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [idempotencyKey] = useState(newKey);
+  const estimate = cart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
+  function handleChange(event) { setAddress((current) => ({ ...current, [event.target.name]: event.target.value })); }
+  async function submit(event) {
+    event.preventDefault(); setError("");
+    if (!cart.length) { setError("Your cart is empty."); return; }
+    const items = cart.map((item) => ({ productId: Number(item.productId ?? item.id), quantity: Number(item.qty) }));
+    if (items.some((item) => !Number.isSafeInteger(item.productId) || item.productId <= 0)) { setError("Remove outdated saved items and add them again from the catalogue."); return; }
+    setBusy(true);
+    try {
+      const result = await placeOrder({ items, address }, idempotencyKey);
+      setCart([]); localStorage.removeItem("cart");
+      navigate(`/success?id=${result.order.id}`, { replace: true, state: { order: result.order } });
+    } catch (err) { setError(err.message || "Unable to place order. Please try again."); }
+    finally { setBusy(false); }
   }
-
-  function placeOrder() {
-    // 🔒 Basic validation
-    if (
-      !address.name ||
-      !address.phone ||
-      !address.street ||
-      !address.city ||
-      !address.pincode
-    ) {
-      alert("Please fill all delivery address fields");
-      return;
-    }
-
-    console.log("Delivery Address:", address);
-
-    alert("Order placed successfully 🎉");
-
-    setCart([]);
-    localStorage.removeItem("cart");
-
-    navigate("/success");
-  }
-
-  return (
-    <div style={{ padding: "20px", maxWidth: "700px", margin: "auto" }}>
-      <h1>🧾 Checkout</h1>
-
-      {/* 📦 DELIVERY ADDRESS */}
-      <h3>Delivery Address</h3>
-
-      <input
-        name="name"
-        placeholder="Full Name"
-        value={address.name}
-        onChange={handleChange}
-        style={inputStyle}
-      />
-
-      <input
-        name="phone"
-        placeholder="Phone Number"
-        value={address.phone}
-        onChange={handleChange}
-        style={inputStyle}
-      />
-
-      <input
-        name="street"
-        placeholder="Street / House No"
-        value={address.street}
-        onChange={handleChange}
-        style={inputStyle}
-      />
-
-      <input
-        name="city"
-        placeholder="City"
-        value={address.city}
-        onChange={handleChange}
-        style={inputStyle}
-      />
-
-      <input
-        name="pincode"
-        placeholder="Pincode"
-        value={address.pincode}
-        onChange={handleChange}
-        style={inputStyle}
-      />
-
-      {/* 🧾 ORDER SUMMARY */}
-      <h3 style={{ marginTop: "25px" }}>Order Summary</h3>
-
-      {cart.map((item, i) => (
-        <div
-          key={i}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: "10px",
-          }}
-        >
-          <span>
-            {item.name} × {item.qty}
-          </span>
-          <span>₹{item.price * item.qty}</span>
-        </div>
-      ))}
-
-      <h2 style={{ textAlign: "right" }}>Total: ₹{total}</h2>
-
-      <button
-        onClick={placeOrder}
-        style={{
-          width: "100%",
-          padding: "12px",
-          background: "#2e7d32",
-          color: "white",
-          border: "none",
-          borderRadius: "5px",
-          fontSize: "16px",
-          cursor: "pointer",
-          marginTop: "20px",
-        }}
-      >
-        Place Order
-      </button>
-    </div>
-  );
+  if (!cart.length) return <section className="content-page"><h1>Checkout</h1><p className="empty-state">Your cart is empty.</p></section>;
+  return <section className="content-page checkout-page"><h1>Checkout</h1>
+    <form onSubmit={submit}>
+      <fieldset className="address-form"><legend>Delivery address</legend>
+        <label>Full name<input name="name" autoComplete="name" value={address.name} onChange={handleChange} required maxLength={100} /></label>
+        <label>Phone number<input name="phone" autoComplete="tel" inputMode="tel" value={address.phone} onChange={handleChange} required maxLength={20} /></label>
+        <label>Street and house number<input name="street" autoComplete="street-address" value={address.street} onChange={handleChange} required maxLength={240} /></label>
+        <label>City<input name="city" autoComplete="address-level2" value={address.city} onChange={handleChange} required maxLength={100} /></label>
+        <label>Postal code<input name="pincode" autoComplete="postal-code" value={address.pincode} onChange={handleChange} required maxLength={12} /></label>
+      </fieldset>
+      <div className="order-summary"><h2>Order summary</h2>{cart.map((item, index) => <div className="summary-line" key={`${item.productId ?? item.id ?? item.name}-${index}`}><span>{item.name} × {item.qty}</span><span>₹{(Number(item.price || 0) * Number(item.qty || 0)).toFixed(2)}</span></div>)}<div className="summary-line summary-total"><span>Estimated total</span><strong>₹{estimate.toFixed(2)}</strong></div><p className="muted">Final prices are confirmed by the server when your order is placed.</p></div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button className="primary-button" type="submit" disabled={busy}>{busy ? "Placing order…" : "Place order"}</button>
+    </form>
+  </section>;
 }
-
-const inputStyle = {
-  width: "100%",
-  padding: "10px",
-  marginBottom: "12px",
-  borderRadius: "5px",
-  border: "1px solid #ccc",
-};
